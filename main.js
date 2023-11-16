@@ -83,7 +83,7 @@ loader.load(
 
     //Si es carrega correctament l'afegim a l'escena
     fanal = gltf.scene;
-    fanal.scale.set(0.2, 0.2, 0.2);
+    fanal.scale.set(0.2,0.2,0.2);
     fanal.position.set(-2.5, -1.1, 0);
     scene.add(fanal);
   },
