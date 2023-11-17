@@ -1,14 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import ModelLoader from "./ModelLoader";
 import "./style.css";
 
 // Declaració d'elements principals
 //Loader de models GLTF
-let loader = null;
+const modelLoader = new ModelLoader();
 //Loader de textures
 let textureLoader = null;
-const rotationSpeed = 0.0001;
+const rotationSpeed = 0.0003;
 let scene = null;
 let camera = null;
 let renderer = null;
@@ -44,7 +44,6 @@ const planeMat = new THREE.MeshStandardMaterial({
 });
 const plane = new THREE.Mesh(planeGeo, planeMat);
 plane.receiveShadow = true;
-plane.position.y = -1;
 plane.rotation.x = Math.PI * -0.5;
 scene.add(plane);
 
@@ -59,51 +58,42 @@ const sphereMAT = new THREE.MeshStandardMaterial({
 
 const bolla = new THREE.Mesh(sphereGeo, sphereMAT);
 bolla.castShadow = true;
-bolla.position.y = 0.5;
+bolla.position.y = 1;
 bolla.position.x = 0.5;
 bolla.position.z = -0.5;
 bolla.scale.set(0.8, 0.8, 0.8);
 scene.add(bolla);
 objects.push(bolla);
 
-let fanal = null;
-//Carregam el fitxer
-loader.load(
-  //Ruta al model
+modelLoader.loadModel(
   "models/Lantern.glb",
-  //FUNCIONS DE CALLBACK
-  function (gltf) {
+  new THREE.Vector3(-2.5, 0, 0),
+  new THREE.Vector3(0.2, 0.2, 0.2),
+  scene,
+  true
+);
 
-    // Recorrem els meshes per habilitar el model per caster sombres
-    gltf.scene.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true; // Habilitam el shadowcasting en els mesh del model
-      }
-    });
-
-    //Si es carrega correctament l'afegim a l'escena
-    fanal = gltf.scene;
-    fanal.scale.set(0.2,0.2,0.2);
-    fanal.position.set(-2.5, -1.1, 0);
-    scene.add(fanal);
-  },
-  function (xhr) {
-    //Aquesta funció de callback es crida mentre es carrega el model
-    //i podem mostrar el progrés de càrrega
-    console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
-  },
-  function (error) {
-    //callback per quan hi ha un error. El podem mostrar per consola.
-    console.error(error);
-  }
+modelLoader.loadModel(
+  "models/BrainStem.glb",
+  new THREE.Vector3(2, 0, 2),
+  new THREE.Vector3(1, 1, 1),
+  scene,
+  true
 );
 
 // Create a warm-colored point light
 const pointLight = new THREE.PointLight(0xffaa00, 6); // Color: Warm yellow, Intensity: 1
-pointLight.position.set(-0.6, 2.5, 0); // Set the position of the light
+pointLight.position.set(-0.6, 3.5, 0); // Set the position of the light
 pointLight.castShadow = true;
 // Add the light to the scene
 scene.add(pointLight);
+
+// Create a warm-colored point light
+const robotoLight = new THREE.PointLight(0xffaa00, 6); // Color: Warm yellow, Intensity: 1
+robotoLight.position.set(2.5, 2.5, 2.5); // Set the position of the light
+robotoLight.castShadow = true;
+// Add the light to the scene
+scene.add(robotoLight);
 
 // Create a light helper for visualization
 // const lightHelper = new THREE.PointLightHelper(pointLight);
@@ -124,22 +114,7 @@ const environmentMap = cubeTextureLoader.load([
 
 scene.background = environmentMap;
 
-let time = Date.now();
-function animate() {
-  const currentTime = Date.now();
-  const deltaTime = currentTime - time;
-  time = currentTime;
 
-  objects.forEach((obj) => {
-    if (obj != null) obj.rotation.y += rotationSpeed * deltaTime;
-  });
-
-  camera.lookAt(bolla.position);
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
-}
-
-animate();
 
 // event javascript per redimensionar de forma responsive
 window.addEventListener("resize", () => {
@@ -154,8 +129,6 @@ window.addEventListener("resize", () => {
 
 // Preparació de l'escena
 function setupScene() {
-  //Loader de models GLTF
-  loader = new GLTFLoader();
   //Loader de textures
   textureLoader = new THREE.TextureLoader();
 
@@ -179,14 +152,58 @@ function setupScene() {
   controls.enableDamping = true;
 
   //directional light
-  const dirlight = new THREE.DirectionalLight(0xffffff, 0.3);
-  dirlight.castShadow = true;
-  dirlight.position.set(4, 4, 2);
-  scene.add(dirlight);
+  // const dirlight = new THREE.DirectionalLight(0xffffff, 0.3);
+  // dirlight.castShadow = true;
+  // dirlight.position.set(4, 4, 2);
+  // scene.add(dirlight);
 
   //spotlight
   // const spotLight = new THREE.SpotLight(0xffffff, 20, 40, Math.PI/8)
   // spotLight.position.set(-5, 4, 1)
   // spotLight.castShadow=true
   // scene.add(spotLight)
+
+}
+
+
+let time = Date.now();
+function animate() {
+  const currentTime = Date.now();
+  const deltaTime = currentTime - time;
+  time = currentTime;
+
+  objects.forEach((obj) => {
+    if (obj != null) obj.rotation.y += rotationSpeed * deltaTime;
+  });
+
+  const objectsWithAnimations = findObjectsWithAnimations(scene)
+
+  objectsWithAnimations.forEach((object) => {
+    object.mixer?.update(deltaTime)
+  });
+
+  console.log(objectsWithAnimations)
+
+  camera.lookAt(bolla.position);
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+function findObjectsWithAnimations(object, result = []) {
+  if (object.actions && object.actions.length > 0) {
+    // This object has animations, add it to the result array
+    result.push(object);
+  }
+
+  if (object.children) {
+    // Recursively check children
+
+    object.children.forEach((child) => {
+      findObjectsWithAnimations(child, result);
+    });
+  }
+
+  return result;
 }
